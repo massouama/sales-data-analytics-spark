@@ -1,0 +1,111 @@
+# =============================================================================
+#  Sales Data Analytics with Apache Spark
+#  Stack Docker : Hadoop HDFS (namenode + datanode) + Spark (master + worker)
+# =============================================================================
+#
+#  Ports hôtes choisis pour NE PAS entrer en conflit avec un éventuel
+#  cluster Hadoop déjà présent sur la machine (qui utilise 9870 / 9864 / 8088) :
+#
+#    - Namenode (UI HDFS) ......... http://localhost:9871
+#    - Datanode (UI) .............. http://localhost:9865
+#    - Spark Master (UI) .......... http://localhost:8082
+#    - Spark Worker (UI) .......... http://localhost:8083
+#
+#  Les services communiquent entre eux via le réseau Docker "bigdata"
+#  par leur nom d'hôte (namenode, spark-master, ...).
+# =============================================================================
+
+services:
+
+  # ----------------------------- HDFS : Namenode -----------------------------
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    hostname: namenode
+    restart: unless-stopped
+    environment:
+      - CLUSTER_NAME=sales-analytics
+    env_file:
+      - ./hadoop.env
+    ports:
+      - "9871:9870"   # Interface web HDFS
+      - "9000:9000"   # RPC HDFS (accès optionnel depuis l'hôte)
+    volumes:
+      - namenode_data:/hadoop/dfs/name
+    networks:
+      - bigdata
+
+  # ----------------------------- HDFS : Datanode -----------------------------
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    hostname: datanode
+    restart: unless-stopped
+    environment:
+      - SERVICE_PRECONDITION=namenode:9870
+    env_file:
+      - ./hadoop.env
+    ports:
+      - "9865:9864"   # Interface web Datanode
+    volumes:
+      - datanode_data:/hadoop/dfs/data
+    depends_on:
+      - namenode
+    networks:
+      - bigdata
+
+  # ---------------------------- Spark : Master -------------------------------
+  spark-master:
+    image: bde2020/spark-master:3.3.0-hadoop3.3
+    container_name: spark-master
+    hostname: spark-master
+    restart: unless-stopped
+    environment:
+      - INIT_DAEMON_STEP=setup_spark
+      # Permet à Spark de résoudre hdfs:// par défaut vers notre namenode
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    env_file:
+      - ./hadoop.env
+    ports:
+      - "8082:8080"   # Interface web Spark Master
+      - "7077:7077"   # Port de soumission du cluster
+    volumes:
+      - ./src:/app/src                 # Code PySpark
+      - ./tests:/app/tests             # Tests unitaires
+      - ./output:/app/output           # Résultats des analyses
+      - ./streaming_input:/app/streaming_input   # Source du flux (extension)
+    depends_on:
+      - namenode
+      - datanode
+    networks:
+      - bigdata
+
+  # ---------------------------- Spark : Worker -------------------------------
+  spark-worker:
+    image: bde2020/spark-worker:3.3.0-hadoop3.3
+    container_name: spark-worker
+    hostname: spark-worker
+    restart: unless-stopped
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    env_file:
+      - ./hadoop.env
+    ports:
+      - "8083:8081"   # Interface web Spark Worker
+    volumes:
+      - ./src:/app/src
+      - ./output:/app/output
+      - ./streaming_input:/app/streaming_input
+    depends_on:
+      - spark-master
+    networks:
+      - bigdata
+
+volumes:
+  namenode_data:
+  datanode_data:
+
+networks:
+  bigdata:
+    name: bigdata

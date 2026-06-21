@@ -1,0 +1,37 @@
+# Données (volumineuses, téléchargées via scripts/download_data.sh)
+data/*.xlsx
+data/*.zip
+data/*.csv
+
+# Résultats d'analyse générés
+output/*.csv
+output/*.html
+output/chart.umd.js
+
+# Flux (fichiers générés par le producteur)
+streaming_input/*.csv
+streaming_input/_*.csv
+
+# Config locale / outils (machine-spécifique)
+.claude/
+
+# Documentation/rapports (non nécessaires à l'exécution du projet)
+docs/
+scripts/preview_proxy.py
+
+# Fichiers auxiliaires LaTeX
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.toc
+docs/*.fls
+docs/*.fdb_latexmk
+docs/*.lof
+docs/*.lot
+docs/*.bbl
+docs/*.blg
+
+# Divers
+.DS_Store
+__pycache__/
+*.pyc
